@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>SQL Workflow Runner</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2rem; background: #f4f6f8; color: #222; }
+        .container { max-width: 800px; margin: 0 auto; padding: 2rem; background: #fff; border-radius: 10px; box-shadow: 0 12px 24px rgba(0,0,0,0.08); }
+        h1 { margin-bottom: 1rem; }
+        form { display: grid; gap: 1rem; }
+        input[type="text"] { width: 100%; padding: 0.9rem 1rem; border: 1px solid #ccd0d5; border-radius: 8px; font-size: 1rem; }
+        button { padding: 0.95rem 1.5rem; background: #0457d9; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; }
+        button:hover { background: #034bb8; }
+        .panel { background: #f8fafc; padding: 1rem; border-radius: 10px; border: 1px solid #e2e8f0; }
+        .panel h2 { margin-top: 0; }
+        pre { white-space: pre-wrap; word-wrap: break-word; margin: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SQL Workflow Runner</h1>
+        <p>Enter a natural language question and the workflow will generate SQL and show the result.</p>
+        <form method="POST">
+            <input type="text" name="question" placeholder="Ask a SQL question..." value="{{ request.form.question if request.form.question else '' }}">
+            <button type="submit">Run</button>
+        </form>
+
+        {% if sql %}
+        <div class="panel" style="margin-top: 1.5rem;">
+            <h2>Generated SQL</h2>
+            <pre>{{ sql }}</pre>
+        </div>
+        {% endif %}
+
+        {% if result %}
+        <div class="panel" style="margin-top: 1.5rem;">
+            <h2>Result</h2>
+            <pre>{{ result }}</pre>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

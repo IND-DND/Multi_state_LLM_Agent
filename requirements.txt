@@ -1,0 +1,15 @@
+langchain
+langchain-ollama
+langgraph
+psycopg2-binary
+pandas
+plotly
+streamlit
+python-dotenv
+sqlalchemy
+flask
+requests
+langchain
+langchain-community
+langchain-ollama
+python-dotenv
