@@ -1,3 +1,7 @@
+# Secure production-oriented upgrade
+
+The new FastAPI, LangGraph, PostgreSQL RLS, and Streamlit application is in **[production/](production/README.md)**. It includes authentication, authorization, guarded SQL, durable checkpoints, export approvals, Docker Compose, and tests. The original prototype below is preserved for reference.
+
 # SQL Agent Assistant
 
 A Flask-based natural-language assistant for querying a sales database with local Ollama models. The project also includes LangGraph workflow code and small tool integrations for weather, news, and dictionary lookups.
