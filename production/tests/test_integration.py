@@ -151,3 +151,11 @@ def test_restart_reads_durable_result(client):
         response = restarted.post(f"/v1/queries/{result['run_id']}/resume", headers=headers())
         assert response.status_code == 200
         assert response.json()["rows"] == result["rows"]
+
+
+def test_history_listing_is_owner_scoped(client):
+    own = query(client)
+    mine = client.get("/v1/queries", headers=headers()).json()
+    other = client.get("/v1/queries", headers=headers("other-tenant")).json()
+    assert own["run_id"] in {item["id"] for item in mine}
+    assert own["run_id"] not in {item["id"] for item in other}

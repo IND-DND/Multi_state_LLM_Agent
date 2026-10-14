@@ -104,6 +104,24 @@ if me is None:
     st.stop()
 permissions = me.json()["permissions"]
 st.sidebar.write("Datasets", me.json()["datasets"])
+history_response = api("GET", "/v1/queries")
+if history_response and history_response.json():
+    history = history_response.json()
+    chosen = st.sidebar.selectbox(
+        "Your recent queries",
+        history,
+        format_func=lambda item: f"{item['question'][:45]} · {item['status']}",
+    )
+    if st.sidebar.button("Load saved query"):
+        response = api("GET", f"/v1/queries/{chosen['id']}")
+        if response:
+            st.session_state.result = response.json()
+    if chosen["status"] in {"running", "failed", "pending"} and st.sidebar.button(
+        "Resume selected query"
+    ):
+        response = api("POST", f"/v1/queries/{chosen['id']}/resume")
+        if response:
+            st.session_state.result = response.json()
 question = st.text_input("Your question", placeholder="Show monthly revenue")
 if st.button("Analyze", type="primary", disabled=not question.strip()):
     if st.session_state.get("last_question") != question:
@@ -124,7 +142,7 @@ if st.button("Start a fresh query"):
     st.rerun()
 result = st.session_state.get("result")
 if result:
-    st.write(result["answer"])
+    st.write(result.get("answer") or result.get("error") or result["status"])
     if result["status"] == "completed":
         st.caption("Run: " + result["run_id"])
         with st.expander("SQL and assumptions"):

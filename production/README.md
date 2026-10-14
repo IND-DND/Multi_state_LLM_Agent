@@ -32,9 +32,9 @@ to those templates. Switch to a real provider for open-ended natural-language qu
 | viewer | INR 300 | Cannot request exports |
 
 Export walkthrough: query as `analyst-north`, request approval, switch to `manager`,
-approve under Export approvals, switch back, submit the same question if needed,
-or use the original run ID through the API to fetch the approved CSV. Changing the
-UI identity clears its session data; the original saved run remains accessible by API.
+approve under Export approvals, switch back, choose the original query from the
+sidebar and click **Load saved query**, then **Fetch approved CSV**. Changing the
+UI identity clears session data; saved queries remain accessible only to their owner.
 
 Stop services with `docker compose down`. Data survives in a named volume.
 `docker compose down -v` deliberately deletes the local demo database.
@@ -99,6 +99,7 @@ All `/v1` endpoints require `Authorization: Bearer <API access token>`.
 | Method | Endpoint | Permission |
 |---|---|---|
 | POST | `/v1/queries` | `analytics:query`; UUID `Idempotency-Key` header |
+| GET | `/v1/queries` | Owner's recent queries under current permissions |
 | GET | `/v1/queries/{run_id}` | Query owner + `analytics:query` |
 | POST | `/v1/queries/{run_id}/resume` | Query owner + `analytics:query` |
 | POST | `/v1/queries/{run_id}/export-request` | Query owner + `analytics:export` |

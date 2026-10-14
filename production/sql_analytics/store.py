@@ -66,6 +66,16 @@ class Store:
         self.check_fingerprint(row, p)
         return row
 
+    async def list_runs(self, p: Principal):
+        async with self.pool.connection() as conn:
+            cur = await conn.execute(
+                "SELECT id,question,status,created_at FROM control.runs "
+                "WHERE identity_tenant=%s AND subject=%s AND fingerprint=%s "
+                "ORDER BY created_at DESC LIMIT 20",
+                (p.identity_tenant, p.subject, p.fingerprint),
+            )
+            return await cur.fetchall()
+
     @asynccontextmanager
     async def run_lock(self, run_id: UUID):
         # Session-scoped lock on a pinned connection: works across replicas and is

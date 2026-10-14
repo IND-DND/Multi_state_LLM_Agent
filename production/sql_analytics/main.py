@@ -25,8 +25,26 @@ from .store import Store
 from .workflow import Context, build_graph
 
 logger = logging.getLogger("sql_analytics")
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(asctime)s level=%(levelname)s %(message)s"))
+    logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+logger.propagate = False
 REQUESTS = Counter("analytics_http_requests_total", "Requests", ["method", "route", "status"])
 LATENCY = Histogram("analytics_http_seconds", "Request latency", ["route"])
+
+
+@asynccontextmanager
+async def capacity(semaphore):
+    try:
+        await asyncio.wait_for(semaphore.acquire(), timeout=1)
+    except TimeoutError as exc:
+        raise DomainError("service_busy_retry_later", 503) from exc
+    try:
+        yield
+    finally:
+        semaphore.release()
 
 
 def csv_bytes(payload):
@@ -56,6 +74,7 @@ def create_app(settings=None):
                     settings.control_dsn.get_secret_value(),
                     min_size=1,
                     max_size=24,
+                    timeout=5,
                     open=False,
                     kwargs={"autocommit": True, "row_factory": dict_row},
                 )
@@ -65,12 +84,20 @@ def create_app(settings=None):
                     settings.query_dsn.get_secret_value(),
                     min_size=1,
                     max_size=settings.max_concurrent_queries,
+                    timeout=5,
                     open=False,
                     kwargs={"autocommit": True, "row_factory": dict_row},
                 )
             )
             await control.wait(timeout=10)
             await query.wait(timeout=10)
+            async with query.connection() as conn:
+                cur = await conn.execute(
+                    "SELECT rolsuper,rolbypassrls,rolinherit FROM pg_roles WHERE rolname=current_user"
+                )
+                role = await cur.fetchone()
+                if not role or any(role.values()):
+                    raise RuntimeError("Query login must be NOSUPERUSER NOBYPASSRLS NOINHERIT")
             saver = await stack.enter_async_context(
                 AsyncPostgresSaver.from_conn_string(settings.checkpoint_dsn.get_secret_value())
             )
@@ -134,7 +161,7 @@ def create_app(settings=None):
 
     async def run_workflow(request, run, p):
         store, graph = request.app.state.store, request.app.state.graph
-        async with request.app.state.semaphore, store.run_lock(run["id"]):
+        async with capacity(request.app.state.semaphore), store.run_lock(run["id"]):
             run = await store.owned_run(run["id"], p)
             if run["status"] in {"completed", "clarification"}:
                 return {"run_id": str(run["id"]), "status": run["status"], **run["response"]}
@@ -197,6 +224,10 @@ def create_app(settings=None):
         await store.rate_limit(p, settings.requests_per_minute)
         run = await store.create_run(p, idempotency_key, body.question)
         return await run_workflow(request, run, p)
+
+    @app.get("/v1/queries")
+    async def history(request: Request, p: Principal = Depends(require("analytics:query"))):
+        return jsonable_encoder(await request.app.state.store.list_runs(p))
 
     @app.get("/v1/queries/{run_id}")
     async def status(
