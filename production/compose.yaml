@@ -1,0 +1,71 @@
+services:
+  db:
+    image: postgres:16-bookworm
+    environment:
+      POSTGRES_DB: analytics
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/init_demo.py first}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U postgres -d analytics]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    # Database is not exposed to the host.
+  bootstrap:
+    build: .
+    env_file: .env
+    command: [python, scripts/bootstrap.py, --demo]
+    depends_on:
+      db:
+        condition: service_healthy
+  api:
+    build: .
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT}
+      AUTH_MODE: ${AUTH_MODE}
+      MODEL_PROVIDER: ${MODEL_PROVIDER}
+      CONTROL_DSN: ${CONTROL_DSN}
+      QUERY_DSN: ${QUERY_DSN}
+      CHECKPOINT_DSN: ${CHECKPOINT_DSN}
+      DEMO_JWT_SECRET: ${DEMO_JWT_SECRET}
+      MODEL_NAME: ${MODEL_NAME:-}
+      MODEL_BASE_URL: ${MODEL_BASE_URL:-http://host.docker.internal:11434/v1}
+      MODEL_API_KEY: ${MODEL_API_KEY:-}
+      AZURE_ENDPOINT: ${AZURE_ENDPOINT:-}
+      AZURE_API_VERSION: ${AZURE_API_VERSION:-2024-10-21}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:-}
+      API_AUDIENCE: ${API_AUDIENCE:-}
+    ports: ["127.0.0.1:8000:8000"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+  ui:
+    build: .
+    command: [python, -m, streamlit, run, ui/app.py, --server.address=0.0.0.0, --server.port=8501, --browser.gatherUsageStats=false]
+    environment:
+      API_URL: http://api:8000
+      AUTH_MODE: ${AUTH_MODE}
+      ENVIRONMENT: ${ENVIRONMENT}
+      DEMO_JWT_SECRET: ${DEMO_JWT_SECRET}
+      UI_CLIENT_ID: ${UI_CLIENT_ID:-}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:-}
+      API_SCOPE: ${API_SCOPE:-}
+    ports: ["127.0.0.1:8501:8501"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      api:
+        condition: service_healthy
+volumes:
+  pgdata:
